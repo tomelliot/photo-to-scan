@@ -1,0 +1,12 @@
+[project]
+name = "docprep"
+version = "0.1.0"
+description = "Document image preprocessing for Paperless-ngx"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.3.1",
+    "opencv-python-headless>=4.13.0.92",
+]
+
+[project.scripts]
+docprep = "docprep:cli"
