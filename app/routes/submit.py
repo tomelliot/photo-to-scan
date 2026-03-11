@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import httpx
 from fastapi import APIRouter, Cookie, Response
 from fastapi.responses import HTMLResponse
@@ -49,9 +51,10 @@ async def submit(
             follow_redirects=True,
             timeout=30,
         ) as client:
+            filename = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + ".pdf"
             resp = await client.post(
                 "/api/documents/post_document/",
-                files={"document": ("document.pdf", pdf_bytes, "application/pdf")},
+                files={"document": (filename, pdf_bytes, "application/pdf")},
             )
             resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
