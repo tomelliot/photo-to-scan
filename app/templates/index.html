@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Paperless Feeder</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body { height: 100%; overflow: hidden; }
+        /* When content doesn't overflow, center it; when it does, scroll naturally */
+        #page-list {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            min-width: 100%;
+            justify-content: center;
+            height: 100%;
+        }
+        /* Once content overflows, switch to start-aligned so scroll works properly */
+        #page-list.has-pages {
+            justify-content: start;
+            min-width: auto;
+        }
+    </style>
+    <script>
+        function scrollToLastPage() {
+            var list = document.getElementById('page-list');
+            var addBtn = list.querySelector('.add-btn');
+            if (addBtn) {
+                addBtn.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+            }
+        }
+
+        function updateListState() {
+            var list = document.getElementById('page-list');
+            var hasPages = list.querySelector('.page-thumb') !== null;
+            list.classList.toggle('has-pages', hasPages);
+        }
+
+        document.addEventListener('htmx:afterSettle', function(e) {
+            var elt = e.detail.elt;
+            updateListState();
+
+            // After upload (beforebegin swap on .add-btn), scroll to the new thumb
+            if (elt && elt.classList && elt.classList.contains('add-btn')) {
+                scrollToLastPage();
+            }
+
+            // After /process completes (outerHTML swap on page-*), wait for image load then scroll
+            if (elt && elt.id && elt.id.startsWith('page-')) {
+                var img = elt.querySelector('img');
+                if (img) {
+                    var doScroll = function() { scrollToLastPage(); };
+                    if (img.complete) {
+                        doScroll();
+                    } else {
+                        img.addEventListener('load', doScroll, { once: true });
+                    }
+                }
+            }
+        });
+    </script>
+</head>
+<body class="h-full bg-gray-100 flex flex-col" x-data="{ uploading: false, submitting: false }">
+
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto p-4 pb-2 relative">
+        <!-- Background heading — sits behind documents -->
+        <h1 class="absolute top-4 left-0 right-0 text-center text-4xl font-bold text-gray-300 pointer-events-none select-none z-0">
+            Paperless Feeder
+        </h1>
+        <div id="page-list" class="gap-3 overflow-x-auto relative z-10"
+             x-init="new Sortable($el, {
+                 animation: 150,
+                 ghostClass: 'opacity-30',
+                 filter: '.add-btn',
+                 onEnd(evt) {
+                     const ids = [...evt.to.children]
+                         .filter(el => el.id.startsWith('page-'))
+                         .map(el => el.id.replace('page-', ''));
+                     fetch('/pages/reorder', {
+                         method: 'PUT',
+                         headers: {'Content-Type': 'application/json'},
+                         body: JSON.stringify({order: ids})
+                     });
+                 }
+             })">
+
+            <!-- Add page button -->
+            <label class="add-btn flex-shrink-0 w-24 h-24 flex items-center justify-center
+                          bg-white border-2 border-dashed border-gray-300 rounded-lg cursor-pointer
+                          hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                   :class="{ 'opacity-50 pointer-events-none': uploading }">
+                <svg x-show="!uploading" class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <svg x-show="uploading" class="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                <input type="file" accept="image/*" capture="environment" class="hidden"
+                       hx-post="/upload" hx-target="#page-list .add-btn" hx-swap="beforebegin"
+                       hx-encoding="multipart/form-data" name="file"
+                       @htmx:before-request="uploading = true"
+                       @htmx:after-request="uploading = false; $el.value = ''">
+            </label>
+        </div>
+    </div>
+
+    <!-- Submit button — fixed at bottom -->
+    <div class="flex-shrink-0 p-4 pt-2 bg-gray-100">
+        <button hx-post="/submit" class="w-full text-white py-3 rounded-lg font-medium" style="background-color: #2A5323;"
+                :class="{ 'opacity-50': submitting }"
+                @htmx:before-request="submitting = true"
+                @htmx:after-request="submitting = false">
+            <span x-show="!submitting">Upload document</span>
+            <span x-show="submitting">Submitting...</span>
+        </button>
+    </div>
+</body>
+</html>

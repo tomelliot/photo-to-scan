@@ -1,0 +1,13 @@
+services:
+  paperless-feeder:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - PAPERLESS_URL=${PAPERLESS_URL:-}
+      - PAPERLESS_TOKEN=${PAPERLESS_TOKEN:-}
+    volumes:
+      - sessions:/tmp/paperless-feeder-sessions
+
+volumes:
+  sessions:

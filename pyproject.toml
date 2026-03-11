@@ -1,12 +1,44 @@
 [project]
 name = "docprep"
 version = "0.1.0"
-description = "Document image preprocessing for Paperless-ngx"
+description = "Paperless Feeder — mobile-first document photo processing for Paperless-ngx"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.3.1",
+    "deskew>=1.5.3",
+    "docaligner-docsaid>=1.1.0",
     "opencv-python-headless>=4.13.0.92",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "python-multipart>=0.0.18",
+    "jinja2>=3.1",
+    "pillow>=11",
+    "httpx>=0.28",
+    "pydantic-settings>=2.7",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8",
+    "pytest-asyncio>=0.25",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+
+override-dependencies = [
+    "onnxruntime-gpu>=1.22; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "onnxruntime>=1.22; sys_platform == 'linux' and platform_machine == 'aarch64'",
+    "pyturbojpeg<2.0",
 ]
 
 [project.scripts]
-docprep = "docprep:cli"
+docprep = "docprep.cli:cli"
