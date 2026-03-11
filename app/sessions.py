@@ -15,6 +15,7 @@ class PageEntry:
     original: Path
     processed: Path | None = None
     status: str = "pending"  # "pending" | "done" | "error"
+    rotation: int = 0  # cumulative CW rotation in degrees (0, 90, 180, 270)
 
 
 @dataclass
