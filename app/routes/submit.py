@@ -43,12 +43,15 @@ async def submit(
     pdf_bytes = build_pdf(session.pages)
 
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(
+            base_url=settings.paperless_url,
+            headers={"Authorization": f"Token {settings.paperless_token}"},
+            follow_redirects=True,
+            timeout=30,
+        ) as client:
             resp = await client.post(
-                f"{settings.paperless_url}/api/documents/post_document/",
-                headers={"Authorization": f"Token {settings.paperless_token}"},
+                "/api/documents/post_document/",
                 files={"document": ("document.pdf", pdf_bytes, "application/pdf")},
-                timeout=30,
             )
             resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
