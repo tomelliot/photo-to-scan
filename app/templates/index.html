@@ -111,14 +111,24 @@
         </div>
     </div>
 
+    <!-- Error modal container (populated via OOB swap) -->
+    <div id="error-modal"></div>
+
     <!-- Submit button — fixed at bottom -->
     <div class="flex-shrink-0 p-4 pt-2 bg-gray-100">
-        <button hx-post="/submit" class="w-full text-white py-3 rounded-lg font-medium" style="background-color: #2A5323;"
-                :class="{ 'opacity-50': submitting }"
+        <button id="submit-btn" hx-post="/submit" hx-swap="none"
+                class="w-full text-white py-3 rounded-lg font-medium" style="background-color: #2A5323;"
+                :class="{ 'opacity-50 pointer-events-none': submitting }"
                 @htmx:before-request="submitting = true"
-                @htmx:after-request="submitting = false">
+                @htmx:after-request="submitting = false; updateListState()">
             <span x-show="!submitting">Upload document</span>
-            <span x-show="submitting">Submitting...</span>
+            <span x-show="submitting" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Submitting&hellip;
+            </span>
         </button>
     </div>
 </body>

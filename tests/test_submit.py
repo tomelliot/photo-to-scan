@@ -51,18 +51,22 @@ def test_submit_clears_session(client, sample_jpeg_file):
         patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
         patch("httpx.AsyncClient", return_value=mock_client),
     ):
-        client.post("/submit", cookies={SESSION_COOKIE: sid})
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
 
     assert get_session(sid) is None
+    # Success response clears the page list via OOB swap
+    assert "add-btn" in resp.text
 
 
-def test_submit_without_paperless_config_returns_503(client, sample_jpeg_file):
+def test_submit_without_paperless_config_shows_error(client, sample_jpeg_file):
     sid = upload_and_process_n(client, sample_jpeg_file, 1)
     resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
-    assert resp.status_code == 503
+    assert resp.status_code == 200
+    assert "Not configured" in resp.text
+    assert "error-modal" in resp.text
 
 
-def test_submit_paperless_error_returns_502(client, sample_jpeg_file):
+def test_submit_paperless_error_shows_error_and_keeps_session(client, sample_jpeg_file):
     sid = upload_and_process_n(client, sample_jpeg_file, 1)
     mock_client = _mock_paperless(status=500)
 
@@ -72,5 +76,7 @@ def test_submit_paperless_error_returns_502(client, sample_jpeg_file):
     ):
         resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
 
-    assert resp.status_code == 502
+    assert resp.status_code == 200
+    assert "Upload failed" in resp.text
+    assert "error-modal" in resp.text
     assert get_session(sid) is not None
