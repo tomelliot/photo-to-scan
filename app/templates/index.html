@@ -20,6 +20,8 @@
             height: 100%;
         }
         .page-thumb { margin-bottom: 0.75rem; }
+        .delete-btn { color: rgb(220, 53, 69); background: transparent; }
+        .delete-btn:hover { color: white; background: rgb(220, 53, 69); }
         /* Once content overflows, switch to start-aligned so scroll works properly */
         #page-list.has-pages {
             justify-content: start;
@@ -39,6 +41,24 @@
             var list = document.getElementById('page-list');
             var hasPages = list.querySelector('.page-thumb') !== null;
             list.classList.toggle('has-pages', hasPages);
+
+            // Update processing count on Alpine root
+            var body = document.querySelector('[x-data]');
+            if (body && body._x_dataStack) {
+                var data = body._x_dataStack[0];
+                data.processing = list.querySelectorAll('.page-thumb[hx-post]').length;
+            }
+        }
+
+        function openLightbox(src) {
+            var lb = document.getElementById('lightbox');
+            lb.querySelector('img').src = src;
+            lb.classList.remove('hidden');
+        }
+        function closeLightbox() {
+            var lb = document.getElementById('lightbox');
+            lb.classList.add('hidden');
+            lb.querySelector('img').src = '';
         }
 
         document.addEventListener('htmx:afterSettle', function(e) {
@@ -65,7 +85,7 @@
         });
     </script>
 </head>
-<body class="h-full bg-gray-100 flex flex-col" x-data="{ uploading: false, submitting: false }">
+<body class="h-full bg-gray-100 flex flex-col" x-data="{ uploading: false, submitting: false, processing: 0 }">
 
     <!-- Scrollable content area -->
     <div class="flex-1 overflow-y-auto p-4 pb-2 relative">
@@ -111,6 +131,12 @@
         </div>
     </div>
 
+    <!-- Lightbox -->
+    <div id="lightbox" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+         onclick="closeLightbox()">
+        <img src="" alt="preview" class="max-w-full max-h-full rounded-lg">
+    </div>
+
     <!-- Error modal container (populated via OOB swap) -->
     <div id="error-modal"></div>
 
@@ -118,11 +144,18 @@
     <div class="flex-shrink-0 p-4 pt-2 bg-gray-100">
         <button id="submit-btn" hx-post="/submit" hx-swap="none"
                 class="w-full text-white py-3 rounded-lg font-medium" style="background-color: #2A5323;"
-                :class="{ 'opacity-50 pointer-events-none': submitting || uploading }"
-                :disabled="submitting || uploading"
+                :class="{ 'opacity-50 pointer-events-none': submitting || uploading || processing > 0 }"
+                :disabled="submitting || uploading || processing > 0"
                 @htmx:before-request="submitting = true"
                 @htmx:after-request="submitting = false; updateListState()">
-            <span x-show="!submitting">Upload document</span>
+            <span x-show="!submitting && processing === 0">Upload document</span>
+            <span x-show="!submitting && processing > 0" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                Processing&hellip;
+            </span>
             <span x-show="submitting" class="flex items-center justify-center gap-2">
                 <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

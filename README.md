@@ -4,6 +4,12 @@ A mobile-first web app for processing document photos and uploading them to [Pap
 
 Take photos of documents with your phone, and Paperless Feeder will automatically detect, crop, deskew, and straighten them — then upload the assembled PDF to your Paperless-ngx instance.
 
+## Screenshots
+
+| Empty state | With pages |
+|:-----------:|:----------:|
+| ![Empty state](docs/screenshot-00.png) | ![With pages](docs/screenshot-01.png) |
+
 ## Examples
 
 | Input | Output |

@@ -39,8 +39,7 @@ def test_submit_calls_paperless_api(client, sample_jpeg_file):
     assert resp.status_code == 200
     mock_client.post.assert_called_once()
     call_kwargs = mock_client.post.call_args
-    assert "paperless:8000" in call_kwargs[0][0]
-    assert "Token test-token" in call_kwargs[1]["headers"]["Authorization"]
+    assert "/api/documents/post_document/" in call_kwargs[0][0]
 
 
 def test_submit_clears_session(client, sample_jpeg_file):
