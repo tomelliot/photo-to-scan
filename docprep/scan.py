@@ -61,6 +61,10 @@ def scan_document(
         return image
 
     corners = polygon.astype(np.float32)
+
+    if corners.shape != (4, 2):
+        return image
+
     dbg.write_quad("01_quad", image, corners.reshape(4, 1, 2).astype(np.int32))
 
     cropped = _perspective_crop(image, corners)
