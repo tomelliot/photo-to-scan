@@ -14,6 +14,16 @@ class ReorderRequest(BaseModel):
     order: list[str]
 
 
+@router.get("/pages", response_class=HTMLResponse)
+async def list_pages(
+    docprep_session: str | None = Cookie(None),
+):
+    session = get_session(docprep_session) if docprep_session else None
+    if not session or not session.pages:
+        return ""
+    return "".join(render_thumbnail(p) for p in session.pages)
+
+
 @router.delete("/pages/{page_id}", response_class=HTMLResponse)
 async def delete_page(
     page_id: str,

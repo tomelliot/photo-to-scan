@@ -110,6 +110,10 @@
                  }
              })">
 
+            <!-- Restore existing session pages on load -->
+            <div hx-get="/pages" hx-trigger="load" hx-target="#page-list .add-btn"
+                 hx-swap="beforebegin" style="display:none"></div>
+
             <!-- Add page button -->
             <label class="add-btn flex-shrink-0 w-24 h-24 flex items-center justify-center
                           bg-white border-2 border-dashed border-gray-300 rounded-lg cursor-pointer
