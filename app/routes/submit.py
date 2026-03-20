@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
 from app.routes.assemble import build_pdf
-from app.sessions import get_session, delete_session, SESSION_COOKIE
+from app.sessions import get_session, delete_session, mark_session_submitted, SESSION_COOKIE
 
 router = APIRouter()
 
@@ -42,6 +42,12 @@ async def submit(
     if not session or not session.pages:
         return _error_html("No pages", "Add at least one page before submitting.")
 
+    if session.submitted:
+        return _error_html(
+            "Already submitted",
+            "This document has already been sent to Paperless-ngx.",
+        )
+
     pdf_bytes = build_pdf(session.pages)
 
     try:
@@ -70,6 +76,7 @@ async def submit(
             f"Details: {type(exc).__name__}",
         )
 
+    mark_session_submitted(session.id)
     delete_session(session.id)
     response.delete_cookie(SESSION_COOKIE)
 

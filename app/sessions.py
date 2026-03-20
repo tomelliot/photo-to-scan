@@ -25,6 +25,7 @@ class Session:
     pages: list[PageEntry] = field(default_factory=list)
     created_at: float = field(default_factory=time)
     last_active: float = field(default_factory=time)
+    submitted: bool = False
 
     def touch(self):
         self.last_active = time()
@@ -66,6 +67,25 @@ def delete_session(session_id: str):
 
 def get_all_sessions() -> dict[str, Session]:
     return _sessions
+
+
+def mark_session_submitted(session_id: str):
+    """Mark a session as submitted both in memory and on disk."""
+    session = _sessions.get(session_id)
+    if session:
+        session.submitted = True
+        (session.work_dir / ".submitted").touch()
+
+
+def cleanup_submitted_sessions():
+    """Remove session directories that were already submitted (marker file present)."""
+    settings = get_settings()
+    base = Path(settings.work_dir)
+    if not base.exists():
+        return
+    for child in base.iterdir():
+        if child.is_dir() and (child / ".submitted").exists():
+            shutil.rmtree(child)
 
 
 def clear_all_sessions():
