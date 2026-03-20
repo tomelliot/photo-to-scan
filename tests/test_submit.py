@@ -2,7 +2,7 @@ from unittest.mock import patch, AsyncMock
 
 import httpx
 
-from app.sessions import SESSION_COOKIE, get_session
+from app.sessions import SESSION_COOKIE, get_session, mark_session_submitted
 from tests.conftest import upload_and_process_n
 
 
@@ -79,3 +79,38 @@ def test_submit_paperless_error_shows_error_and_keeps_session(client, sample_jpe
     assert "Upload failed" in resp.text
     assert "error-modal" in resp.text
     assert get_session(sid) is not None
+
+
+def test_double_submit_returns_error(client, sample_jpeg_file):
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    mock_client = _mock_paperless()
+
+    # Mark as already submitted
+    mark_session_submitted(sid)
+
+    with (
+        patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
+        patch("httpx.AsyncClient", return_value=mock_client),
+    ):
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+
+    assert resp.status_code == 200
+    assert "Already submitted" in resp.text
+    mock_client.post.assert_not_called()
+
+
+def test_submit_writes_submitted_marker(client, sample_jpeg_file):
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    session = get_session(sid)
+    work_dir = session.work_dir
+    mock_client = _mock_paperless()
+
+    with (
+        patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
+        patch("httpx.AsyncClient", return_value=mock_client),
+        patch("app.routes.submit.delete_session"),  # prevent cleanup so we can check marker
+    ):
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+
+    assert resp.status_code == 200
+    assert (work_dir / ".submitted").exists()
