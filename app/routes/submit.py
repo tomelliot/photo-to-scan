@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
 from app.routes.assemble import build_pdf
-from app.sessions import get_session, delete_session, mark_session_submitted, SESSION_COOKIE
+from app.sessions import get_session, archive_session, mark_session_submitted, SESSION_COOKIE
 
 router = APIRouter()
 
@@ -77,7 +77,7 @@ async def submit(
         )
 
     mark_session_submitted(session.id)
-    delete_session(session.id)
+    archive_session(session.id, reason="submitted")
     response.delete_cookie(SESSION_COOKIE)
 
     # OOB swap to clear the page list back to starting state

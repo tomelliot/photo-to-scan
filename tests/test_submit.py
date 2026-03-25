@@ -1,8 +1,9 @@
+import json
 from unittest.mock import patch, AsyncMock
 
 import httpx
 
-from app.sessions import SESSION_COOKIE, get_session, mark_session_submitted
+from app.sessions import SESSION_COOKIE, get_session, mark_session_submitted, SESSION_META_FILE
 from tests.conftest import upload_and_process_n
 
 
@@ -42,8 +43,10 @@ def test_submit_calls_paperless_api(client, sample_jpeg_file):
     assert "/api/documents/post_document/" in call_kwargs[0][0]
 
 
-def test_submit_clears_session(client, sample_jpeg_file):
+def test_submit_archives_session(client, sample_jpeg_file):
     sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    session = get_session(sid)
+    work_dir = session.work_dir
     mock_client = _mock_paperless()
 
     with (
@@ -52,9 +55,16 @@ def test_submit_clears_session(client, sample_jpeg_file):
     ):
         resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
 
+    # Session removed from memory
     assert get_session(sid) is None
     # Success response clears the page list via OOB swap
     assert "add-btn" in resp.text
+    # Work dir still exists with metadata
+    assert work_dir.exists()
+    assert (work_dir / SESSION_META_FILE).exists()
+    meta = json.loads((work_dir / SESSION_META_FILE).read_text())
+    assert meta["reason"] == "submitted"
+    assert meta["page_count"] == 1
 
 
 def test_submit_without_paperless_config_shows_error(client, sample_jpeg_file):
@@ -99,7 +109,7 @@ def test_double_submit_returns_error(client, sample_jpeg_file):
     mock_client.post.assert_not_called()
 
 
-def test_submit_writes_submitted_marker(client, sample_jpeg_file):
+def test_submit_writes_session_meta(client, sample_jpeg_file):
     sid = upload_and_process_n(client, sample_jpeg_file, 1)
     session = get_session(sid)
     work_dir = session.work_dir
@@ -108,9 +118,13 @@ def test_submit_writes_submitted_marker(client, sample_jpeg_file):
     with (
         patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
         patch("httpx.AsyncClient", return_value=mock_client),
-        patch("app.routes.submit.delete_session"),  # prevent cleanup so we can check marker
     ):
         resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
 
     assert resp.status_code == 200
-    assert (work_dir / ".submitted").exists()
+    assert (work_dir / SESSION_META_FILE).exists()
+    meta = json.loads((work_dir / SESSION_META_FILE).read_text())
+    assert meta["reason"] == "submitted"
+    assert "archived_at" in meta
+    assert "created_at" in meta
+    assert meta["page_count"] == 1

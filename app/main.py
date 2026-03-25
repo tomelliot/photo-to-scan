@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from app.cleanup import cleanup_loop
-from app.sessions import cleanup_submitted_sessions
+from app.config import get_settings
+from app.sessions import purge_expired_archives
 from app.routes.pages import router as pages_router
 from app.routes.upload import router as upload_router
 from app.routes.process import router as process_router
@@ -16,8 +17,9 @@ from app.routes.submit import router as submit_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    cleanup_submitted_sessions()
-    task = asyncio.create_task(cleanup_loop())
+    settings = get_settings()
+    purge_expired_archives(settings.retention_days)
+    task = asyncio.create_task(cleanup_loop(retention_days=settings.retention_days))
     yield
     task.cancel()
 
