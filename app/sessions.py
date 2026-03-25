@@ -93,11 +93,6 @@ def archive_session(session_id: str, reason: str = "submitted"):
     meta_path = session.work_dir / SESSION_META_FILE
     meta_path.write_text(json.dumps(meta, indent=2))
 
-    # Remove legacy .submitted marker if present
-    submitted_marker = session.work_dir / ".submitted"
-    if submitted_marker.exists():
-        submitted_marker.unlink()
-
     logger.info(
         "Session archived: %s reason=%s pages=%d",
         session_id,
@@ -114,10 +109,7 @@ def mark_session_submitted(session_id: str):
 
 
 def purge_expired_archives(retention_days: int | None = None):
-    """Scan work_dir for archived session dirs past retention and delete them.
-
-    Also handles migration of legacy .submitted marker dirs.
-    """
+    """Scan work_dir for archived session dirs past retention and delete them."""
     settings = get_settings()
     if retention_days is None:
         retention_days = settings.retention_days
@@ -133,37 +125,18 @@ def purge_expired_archives(retention_days: int | None = None):
             continue
 
         meta_path = child / SESSION_META_FILE
-        submitted_marker = child / ".submitted"
+        if not meta_path.exists():
+            continue
 
-        if meta_path.exists():
-            # Archived session — check if past retention
-            try:
-                meta = json.loads(meta_path.read_text())
-                archived_at = datetime.fromisoformat(meta["archived_at"])
-                if archived_at < cutoff:
-                    shutil.rmtree(child)
-                    logger.info("Session purged: %s (archived_at=%s)", child.name, meta["archived_at"])
-            except (json.JSONDecodeError, KeyError, ValueError):
-                # Malformed metadata — purge immediately
+        try:
+            meta = json.loads(meta_path.read_text())
+            archived_at = datetime.fromisoformat(meta["archived_at"])
+            if archived_at < cutoff:
                 shutil.rmtree(child)
-                logger.warning("Session purged (malformed metadata): %s", child.name)
-
-        elif submitted_marker.exists():
-            # Legacy .submitted marker — migrate: archive now, purge in retention_days
-            meta = {
-                "created_at": now.isoformat(),
-                "archived_at": now.isoformat(),
-                "reason": "submitted",
-                "page_count": 0,
-            }
-            meta_path.write_text(json.dumps(meta, indent=2))
-            submitted_marker.unlink()
-            logger.info("Legacy session migrated: %s", child.name)
-
-
-def cleanup_submitted_sessions():
-    """Startup cleanup — now retention-aware."""
-    purge_expired_archives()
+                logger.info("Session purged: %s (archived_at=%s)", child.name, meta["archived_at"])
+        except (json.JSONDecodeError, KeyError, ValueError):
+            shutil.rmtree(child)
+            logger.warning("Session purged (malformed metadata): %s", child.name)
 
 
 def clear_all_sessions():

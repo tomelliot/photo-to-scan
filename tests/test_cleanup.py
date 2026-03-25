@@ -8,7 +8,6 @@ from app.sessions import (
     create_session,
     get_session,
     clear_all_sessions,
-    cleanup_submitted_sessions,
     purge_expired_archives,
     archive_session,
     SESSION_META_FILE,
@@ -47,27 +46,6 @@ def test_active_sessions_are_preserved():
     assert sid not in removed
     assert get_session(sid) is not None
     assert session.work_dir.exists()
-
-
-def test_cleanup_submitted_sessions_migrates_legacy_markers(tmp_path):
-    """Legacy .submitted dirs are migrated to .session_meta.json, not deleted."""
-    submitted_dir = tmp_path / "submitted-session"
-    submitted_dir.mkdir()
-    (submitted_dir / ".submitted").touch()
-
-    active_dir = tmp_path / "active-session"
-    active_dir.mkdir()
-
-    with patch("app.sessions.get_settings") as mock_settings:
-        mock_settings.return_value.work_dir = str(tmp_path)
-        mock_settings.return_value.retention_days = 7
-        cleanup_submitted_sessions()
-
-    # Legacy dir should be migrated, not deleted
-    assert submitted_dir.exists()
-    assert (submitted_dir / SESSION_META_FILE).exists()
-    assert not (submitted_dir / ".submitted").exists()
-    assert active_dir.exists()
 
 
 def test_purge_removes_archives_past_retention(tmp_path):
