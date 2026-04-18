@@ -10,6 +10,7 @@ import numpy as np
 
 from docprep.debug import DebugWriter
 from docprep.deskew import deskew_image
+from docprep.enhance import enhance_document
 
 
 def _get_model():
@@ -45,11 +46,14 @@ def scan_document(
     image: np.ndarray,
     debug_dir: Path | None = None,
     debug_prefix: str = "",
+    *,
+    enhance: bool = True,
 ) -> np.ndarray:
-    """Detect, crop, and deskew a document from a photo.
+    """Detect, crop, deskew, and enhance a document from a photo.
 
-    Returns the cropped and deskewed document, or the original image
-    if no document is detected.
+    Returns the cropped, deskewed, and (by default) enhanced document, or the
+    original image if no document is detected. Set ``enhance=False`` to return
+    the geometric-only result without shadow/white-balance/contrast correction.
     """
     dbg = DebugWriter(debug_dir, debug_prefix)
     dbg.write("00_input", image)
@@ -71,5 +75,7 @@ def scan_document(
     dbg.write("02_cropped", cropped)
 
     result = deskew_image(cropped)
+    if enhance:
+        result = enhance_document(result, debug=dbg)
     dbg.write("99_final", result)
     return result
