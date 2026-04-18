@@ -21,6 +21,57 @@ def test_index_has_sortable(client):
     assert "Sortable" in resp.text or "sortablejs" in resp.text
 
 
+def test_index_has_label_selector_button(client):
+    resp = client.get("/")
+    # Button exists with a stable id
+    assert 'id="label-selector-btn"' in resp.text
+
+
+def test_label_selector_starts_disabled(client):
+    """The label selector should be disabled until tags load in the background."""
+    resp = client.get("/")
+    # Alpine should bind disabled to a state that starts true (tags not yet loaded)
+    assert ":disabled" in resp.text
+    # Initial Alpine state declares that tags are loading / unavailable
+    assert "tagsLoaded" in resp.text
+
+
+def test_label_selector_uses_lucide_icon(client):
+    resp = client.get("/")
+    # Use a Lucide icon (tag/tags) — referenced by the lucide CDN script
+    assert "lucide" in resp.text.lower()
+
+
+def test_label_selector_loads_tags_in_background(client):
+    """Tags should be fetched on page load via /tags."""
+    resp = client.get("/")
+    assert "/tags" in resp.text
+
+
+def test_label_selector_popover_has_search(client):
+    resp = client.get("/")
+    # Popover container with search input
+    assert 'id="label-popover"' in resp.text
+    assert 'id="label-search"' in resp.text
+
+
+def test_submit_button_includes_selected_tags(client):
+    resp = client.get("/")
+    # The submit button should send selected tag IDs via hx-vals
+    assert "hx-vals" in resp.text
+    assert "selectedTags" in resp.text or "tags" in resp.text
+
+
+def test_label_selector_to_left_of_submit(client):
+    """The label selector and submit button should share a row, selector on the left."""
+    resp = client.get("/")
+    text = resp.text
+    selector_idx = text.find('id="label-selector-btn"')
+    submit_idx = text.find('id="submit-btn"')
+    assert selector_idx != -1 and submit_idx != -1
+    assert selector_idx < submit_idx
+
+
 def test_full_flow_integration(client, sample_jpeg_file):
     # Upload 2 images and process them
     sid = upload_and_process_n(client, sample_jpeg_file, 2)
