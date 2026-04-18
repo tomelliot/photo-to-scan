@@ -109,6 +109,51 @@ def test_double_submit_returns_error(client, sample_jpeg_file):
     mock_client.post.assert_not_called()
 
 
+def test_submit_forwards_selected_tags(client, sample_jpeg_file):
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    mock_client = _mock_paperless()
+
+    with (
+        patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
+        patch("httpx.AsyncClient", return_value=mock_client),
+    ):
+        resp = client.post(
+            "/submit",
+            data={"tags": ["3", "7"]},
+            cookies={SESSION_COOKIE: sid},
+        )
+
+    assert resp.status_code == 200
+    mock_client.post.assert_called_once()
+    sent_data = mock_client.post.call_args.kwargs["data"]
+    # httpx accepts a list of tuples for repeated form fields
+    if isinstance(sent_data, list):
+        tag_values = [v for k, v in sent_data if k == "tags"]
+    else:
+        tag_values = sent_data.get("tags") if not isinstance(sent_data.get("tags"), str) else [sent_data["tags"]]
+    assert sorted(tag_values) == ["3", "7"]
+
+
+def test_submit_without_tags_sends_no_tag_field(client, sample_jpeg_file):
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    mock_client = _mock_paperless()
+
+    with (
+        patch("app.routes.submit.get_settings", return_value=_settings_with_paperless()),
+        patch("httpx.AsyncClient", return_value=mock_client),
+    ):
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+
+    assert resp.status_code == 200
+    sent_data = mock_client.post.call_args.kwargs.get("data")
+    if sent_data is None:
+        return
+    if isinstance(sent_data, list):
+        assert not any(k == "tags" for k, _ in sent_data)
+    else:
+        assert "tags" not in sent_data
+
+
 def test_submit_writes_session_meta(client, sample_jpeg_file):
     sid = upload_and_process_n(client, sample_jpeg_file, 1)
     session = get_session(sid)

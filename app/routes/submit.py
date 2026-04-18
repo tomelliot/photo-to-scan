@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Cookie, Form, Response
 from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
@@ -29,6 +29,7 @@ def _error_html(title: str, detail: str) -> str:
 async def submit(
     response: Response,
     docprep_session: str | None = Cookie(None),
+    tags: list[int] = Form(default_factory=list),
 ):
     settings = get_settings()
     if not settings.paperless_url or not settings.paperless_token:
@@ -58,9 +59,14 @@ async def submit(
             timeout=30,
         ) as client:
             filename = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + ".pdf"
+            post_kwargs: dict = {
+                "files": {"document": (filename, pdf_bytes, "application/pdf")},
+            }
+            if tags:
+                post_kwargs["data"] = [("tags", str(tag_id)) for tag_id in tags]
             resp = await client.post(
                 "/api/documents/post_document/",
-                files={"document": (filename, pdf_bytes, "application/pdf")},
+                **post_kwargs,
             )
             resp.raise_for_status()
     except httpx.HTTPStatusError as exc:
