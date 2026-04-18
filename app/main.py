@@ -13,6 +13,7 @@ from app.routes.pages_mgmt import router as pages_mgmt_router
 from app.routes.rotate import router as rotate_router
 from app.routes.assemble import router as assemble_router
 from app.routes.submit import router as submit_router
+from app.routes.tags import router as tags_router
 
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(rotate_router)
     app.include_router(assemble_router)
     app.include_router(submit_router)
+    app.include_router(tags_router)
     return app
 
 
