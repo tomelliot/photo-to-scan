@@ -7,22 +7,13 @@ from fastapi.responses import HTMLResponse
 from app.config import get_settings
 from app.routes.assemble import build_pdf
 from app.sessions import Session, archive_session, mark_session_submitted, optional_session, SESSION_COOKIE
+from app.templating import templates
 
 router = APIRouter()
 
 
 def _error_html(title: str, detail: str) -> str:
-    return (
-        '<div id="error-modal" hx-swap-oob="innerHTML">'
-        '<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"'
-        ' onclick="if(event.target===this){document.getElementById(\'error-modal\').innerHTML=\'\'}">'
-        '<div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">'
-        f'<h2 class="text-lg font-semibold text-red-600 mb-2">{title}</h2>'
-        f'<p class="text-gray-600 text-sm mb-4">{detail}</p>'
-        '<button onclick="document.getElementById(\'error-modal\').innerHTML=\'\'"'
-        ' class="w-full bg-gray-800 text-white py-2 rounded-lg font-medium">Dismiss</button>'
-        '</div></div></div>'
-    )
+    return templates.get_template("error_modal.html").render(title=title, detail=detail)
 
 
 @router.post("/submit", response_class=HTMLResponse)
