@@ -78,7 +78,6 @@ def get_all_sessions() -> dict[str, Session]:
 
 
 def archive_session(session_id: str, reason: str = "submitted"):
-    """Archive a session: write metadata file and remove from in-memory store."""
     session = _sessions.pop(session_id, None)
     if not session:
         return
