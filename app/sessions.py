@@ -9,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from time import time
 
+from fastapi import Cookie, HTTPException
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,17 @@ def create_session() -> Session:
 
 def get_session(session_id: str) -> Session | None:
     return _sessions.get(session_id)
+
+
+def optional_session(docprep_session: str | None = Cookie(None)) -> Session | None:
+    return get_session(docprep_session) if docprep_session else None
+
+
+def require_session(docprep_session: str | None = Cookie(None)) -> Session:
+    session = optional_session(docprep_session)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 def delete_session(session_id: str):

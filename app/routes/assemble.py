@@ -1,10 +1,10 @@
 import io
 
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import StreamingResponse
 from PIL import Image
 
-from app.sessions import get_session
+from app.sessions import Session, optional_session
 
 router = APIRouter()
 
@@ -25,9 +25,8 @@ def build_pdf(pages) -> bytes:
 @router.post("/assemble")
 async def assemble(
     response: Response,
-    docprep_session: str | None = Cookie(None),
+    session: Session | None = Depends(optional_session),
 ):
-    session = get_session(docprep_session) if docprep_session else None
     if not session or not session.pages:
         response.status_code = 422
         return {"error": "No pages to assemble"}

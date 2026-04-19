@@ -1,11 +1,9 @@
-import shutil
-
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.rendering import render_thumbnail
-from app.sessions import get_session
+from app.sessions import Session, optional_session, require_session
 
 router = APIRouter()
 
@@ -16,9 +14,8 @@ class ReorderRequest(BaseModel):
 
 @router.get("/pages", response_class=HTMLResponse)
 async def list_pages(
-    docprep_session: str | None = Cookie(None),
+    session: Session | None = Depends(optional_session),
 ):
-    session = get_session(docprep_session) if docprep_session else None
     if not session or not session.pages:
         return ""
     return "".join(render_thumbnail(p) for p in session.pages)
@@ -28,20 +25,14 @@ async def list_pages(
 async def delete_page(
     page_id: str,
     response: Response,
-    docprep_session: str | None = Cookie(None),
+    session: Session = Depends(require_session),
 ):
-    session = get_session(docprep_session) if docprep_session else None
-    if not session:
-        response.status_code = 404
-        return "<p>Session not found.</p>"
-
     page = next((p for p in session.pages if p.id == page_id), None)
     if not page:
         response.status_code = 404
         return "<p>Page not found.</p>"
 
     session.pages.remove(page)
-    # Clean up files
     for path in [page.original, page.processed]:
         if path and path.exists():
             path.unlink()
@@ -53,13 +44,8 @@ async def delete_page(
 async def reorder_pages(
     body: ReorderRequest,
     response: Response,
-    docprep_session: str | None = Cookie(None),
+    session: Session = Depends(require_session),
 ):
-    session = get_session(docprep_session) if docprep_session else None
-    if not session:
-        response.status_code = 404
-        return "<p>Session not found.</p>"
-
     page_map = {p.id: p for p in session.pages}
     if not all(pid in page_map for pid in body.order):
         response.status_code = 422

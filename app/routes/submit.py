@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Cookie, Form, Response
+from fastapi import APIRouter, Depends, Form, Response
 from fastapi.responses import HTMLResponse
 
 from app.config import get_settings
 from app.routes.assemble import build_pdf
-from app.sessions import get_session, archive_session, mark_session_submitted, SESSION_COOKIE
+from app.sessions import Session, archive_session, mark_session_submitted, optional_session, SESSION_COOKIE
 
 router = APIRouter()
 
@@ -28,7 +28,7 @@ def _error_html(title: str, detail: str) -> str:
 @router.post("/submit", response_class=HTMLResponse)
 async def submit(
     response: Response,
-    docprep_session: str | None = Cookie(None),
+    session: Session | None = Depends(optional_session),
     tags: list[int] = Form(default_factory=list),
 ):
     settings = get_settings()
@@ -39,7 +39,6 @@ async def submit(
             "Configure PAPERLESS_URL and PAPERLESS_TOKEN environment variables.",
         )
 
-    session = get_session(docprep_session) if docprep_session else None
     if not session or not session.pages:
         return _error_html("No pages", "Add at least one page before submitting.")
 

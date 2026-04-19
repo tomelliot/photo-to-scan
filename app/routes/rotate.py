@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import HTMLResponse
 from PIL import Image
 
 from app.rendering import render_thumbnail
-from app.sessions import get_session
+from app.sessions import Session, require_session
 
 router = APIRouter()
 
@@ -12,19 +12,13 @@ router = APIRouter()
 async def rotate_page(
     page_id: str,
     response: Response,
-    docprep_session: str | None = Cookie(None),
+    session: Session = Depends(require_session),
 ):
-    session = get_session(docprep_session) if docprep_session else None
-    if not session:
-        response.status_code = 404
-        return "<p>Session not found.</p>"
-
     page = next((p for p in session.pages if p.id == page_id), None)
     if not page:
         response.status_code = 404
         return "<p>Page not found.</p>"
 
-    # Rotate image files 90 degrees clockwise on disk
     for path in [page.original, page.processed]:
         if path and path.exists():
             with Image.open(path) as img:
