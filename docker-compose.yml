@@ -1,6 +1,7 @@
 services:
   paperless-feeder:
     build: .
+    restart: unless-stopped
     ports:
       - "8001:8000"
     environment:
