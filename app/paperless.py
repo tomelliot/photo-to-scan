@@ -1,0 +1,92 @@
+"""Client for the Paperless-ngx external API.
+
+Owns the `httpx.AsyncClient` configuration for every outbound Paperless call.
+Callers open `async with paperless_client(settings) as pp` and invoke typed
+methods; they do not touch `httpx` directly.
+
+This exists so the set of invariants we care about for Paperless calls —
+`base_url`, `follow_redirects=True`, auth header, request timeout — lives in
+exactly one place. See STANDARDS.md rule 1.
+"""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import AsyncIterator
+
+import httpx
+
+from app.config import Settings
+
+
+_DEFAULT_TIMEOUT_SECONDS = 30
+
+
+class PaperlessNotConfigured(Exception):
+    """Raised when Paperless URL / token are missing from settings."""
+
+
+@dataclass(frozen=True)
+class Tag:
+    id: int
+    name: str
+
+
+class PaperlessClient:
+    """Typed wrapper over an `httpx.AsyncClient` pointed at Paperless-ngx.
+
+    Do not construct directly; use `paperless_client(settings)`.
+    """
+
+    def __init__(self, transport: httpx.AsyncClient):
+        self._transport = transport
+
+    async def list_tags(self) -> list[Tag]:
+        tags: list[Tag] = []
+        url: str | None = "/api/tags/?page_size=200"
+        while url:
+            resp = await self._transport.get(url)
+            resp.raise_for_status()
+            payload = resp.json()
+            tags.extend(
+                Tag(id=t["id"], name=t["name"]) for t in payload.get("results", [])
+            )
+            url = payload.get("next")
+        return tags
+
+    async def post_document(
+        self,
+        pdf_bytes: bytes,
+        tag_ids: list[int],
+        filename: str,
+    ) -> None:
+        post_kwargs: dict = {
+            "files": {"document": (filename, pdf_bytes, "application/pdf")},
+        }
+        if tag_ids:
+            post_kwargs["data"] = [("tags", str(tid)) for tid in tag_ids]
+        resp = await self._transport.post(
+            "/api/documents/post_document/", **post_kwargs
+        )
+        resp.raise_for_status()
+
+
+@asynccontextmanager
+async def paperless_client(settings: Settings) -> AsyncIterator[PaperlessClient]:
+    """Open a configured `PaperlessClient`.
+
+    Raises `PaperlessNotConfigured` if URL or token are missing. Callers that
+    surface a user-facing error decide the error shape themselves (HTML modal,
+    HTTP status, etc.).
+    """
+    if not settings.paperless_url or not settings.paperless_token:
+        raise PaperlessNotConfigured()
+
+    async with httpx.AsyncClient(
+        base_url=settings.paperless_url,
+        headers={"Authorization": f"Token {settings.paperless_token}"},
+        follow_redirects=True,
+        timeout=_DEFAULT_TIMEOUT_SECONDS,
+    ) as transport:
+        yield PaperlessClient(transport)

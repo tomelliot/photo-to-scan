@@ -4,9 +4,16 @@ import httpx
 from fastapi import APIRouter, Depends, Form, Response
 from fastapi.responses import HTMLResponse
 
-from app.config import get_settings
+from app.config import Settings, get_settings
+from app.paperless import PaperlessNotConfigured, paperless_client
 from app.routes.assemble import build_pdf
-from app.sessions import Session, archive_session, mark_session_submitted, optional_session, SESSION_COOKIE
+from app.sessions import (
+    SESSION_COOKIE,
+    Session,
+    archive_session,
+    mark_session_submitted,
+    optional_session,
+)
 from app.templating import templates
 
 router = APIRouter()
@@ -20,16 +27,9 @@ def _error_html(title: str, detail: str) -> str:
 async def submit(
     response: Response,
     session: Session | None = Depends(optional_session),
+    settings: Settings = Depends(get_settings),
     tags: list[int] = Form(default_factory=list),
 ):
-    settings = get_settings()
-    if not settings.paperless_url or not settings.paperless_token:
-        return _error_html(
-            "Not configured",
-            "Paperless-ngx URL and API token are not set. "
-            "Configure PAPERLESS_URL and PAPERLESS_TOKEN environment variables.",
-        )
-
     if not session or not session.pages:
         return _error_html("No pages", "Add at least one page before submitting.")
 
@@ -40,25 +40,17 @@ async def submit(
         )
 
     pdf_bytes = build_pdf(session.pages)
+    filename = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + ".pdf"
 
     try:
-        async with httpx.AsyncClient(
-            base_url=settings.paperless_url,
-            headers={"Authorization": f"Token {settings.paperless_token}"},
-            follow_redirects=True,
-            timeout=30,
-        ) as client:
-            filename = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + ".pdf"
-            post_kwargs: dict = {
-                "files": {"document": (filename, pdf_bytes, "application/pdf")},
-            }
-            if tags:
-                post_kwargs["data"] = [("tags", str(tag_id)) for tag_id in tags]
-            resp = await client.post(
-                "/api/documents/post_document/",
-                **post_kwargs,
-            )
-            resp.raise_for_status()
+        async with paperless_client(settings) as pp:
+            await pp.post_document(pdf_bytes, tags, filename)
+    except PaperlessNotConfigured:
+        return _error_html(
+            "Not configured",
+            "Paperless-ngx URL and API token are not set. "
+            "Configure PAPERLESS_URL and PAPERLESS_TOKEN environment variables.",
+        )
     except httpx.HTTPStatusError as exc:
         return _error_html(
             "Upload failed",

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app.config import Settings, get_settings
 from app.main import create_app
 from app.sessions import SESSION_COOKIE, clear_all_sessions, get_session
 
@@ -19,6 +20,21 @@ def app():
 @pytest.fixture
 def client(app):
     return TestClient(app)
+
+
+@pytest.fixture
+def paperless_configured(app):
+    """Override `get_settings` so Paperless appears configured.
+
+    Use on any test that drives `/submit` or `/tags` end-to-end.
+    """
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        paperless_url="http://paperless:8000",
+        paperless_token="test-token",
+        work_dir="/tmp/paperless-feeder-sessions",
+    )
+    yield
+    app.dependency_overrides.pop(get_settings, None)
 
 
 @pytest.fixture

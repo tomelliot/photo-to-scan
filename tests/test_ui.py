@@ -71,7 +71,7 @@ def test_label_selector_to_left_of_submit(client):
     assert selector_idx < submit_idx
 
 
-def test_full_flow_integration(client, sample_jpeg_file):
+def test_full_flow_integration(client, paperless_configured, sample_jpeg_file):
     # Upload 2 images and process them
     sid = upload_and_process_n(client, sample_jpeg_file, 2)
     session = get_session(sid)
@@ -90,13 +90,7 @@ def test_full_flow_integration(client, sample_jpeg_file):
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    from app.config import Settings
-    settings = Settings(paperless_url="http://paperless:8000", paperless_token="tok", work_dir="/tmp/paperless-feeder-sessions")
-
-    with (
-        patch("app.routes.submit.get_settings", return_value=settings),
-        patch("httpx.AsyncClient", return_value=mock_client),
-    ):
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
         resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
 
     assert resp.status_code == 200

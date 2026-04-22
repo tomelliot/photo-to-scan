@@ -1,34 +1,21 @@
 """Proxy endpoint exposing Paperless-ngx tags to the frontend."""
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-from app.config import get_settings
+from app.config import Settings, get_settings
+from app.paperless import PaperlessNotConfigured, paperless_client
 
 router = APIRouter()
 
 
 @router.get("/tags")
-async def list_tags():
-    settings = get_settings()
-    if not settings.paperless_url or not settings.paperless_token:
-        raise HTTPException(status_code=503, detail="Paperless-ngx not configured")
-
-    tags: list[dict] = []
+async def list_tags(settings: Settings = Depends(get_settings)):
     try:
-        async with httpx.AsyncClient(
-            base_url=settings.paperless_url,
-            headers={"Authorization": f"Token {settings.paperless_token}"},
-            follow_redirects=True,
-            timeout=10,
-        ) as client:
-            url = "/api/tags/?page_size=200"
-            while url:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                payload = resp.json()
-                tags.extend(payload.get("results", []))
-                url = payload.get("next")
+        async with paperless_client(settings) as pp:
+            tags = await pp.list_tags()
+    except PaperlessNotConfigured:
+        raise HTTPException(status_code=503, detail="Paperless-ngx not configured")
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             status_code=502,
@@ -40,4 +27,4 @@ async def list_tags():
             detail=f"Could not reach Paperless-ngx: {type(exc).__name__}",
         )
 
-    return [{"id": t["id"], "name": t["name"]} for t in tags]
+    return [{"id": t.id, "name": t.name} for t in tags]

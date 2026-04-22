@@ -5,17 +5,6 @@ from unittest.mock import patch, AsyncMock
 import httpx
 
 
-def _settings_with_paperless(**overrides):
-    defaults = {
-        "paperless_url": "http://paperless:8000",
-        "paperless_token": "test-token",
-        "work_dir": "/tmp/paperless-feeder-sessions",
-    }
-    defaults.update(overrides)
-    from app.config import Settings
-    return Settings(**defaults)
-
-
 def _mock_paperless_tags_response(results, next_page=None):
     body = {"count": len(results), "next": next_page, "previous": None, "results": results}
     return httpx.Response(200, json=body, request=httpx.Request("GET", "http://paperless:8000/api/tags/"))
@@ -30,17 +19,14 @@ def _mock_async_client(*responses):
     return mock_client
 
 
-def test_tags_returns_paperless_tags(client):
+def test_tags_returns_paperless_tags(client, paperless_configured):
     results = [
         {"id": 1, "name": "Invoice", "slug": "invoice", "colour": 1},
         {"id": 2, "name": "Receipt", "slug": "receipt", "colour": 2},
     ]
     mock_client = _mock_async_client(_mock_paperless_tags_response(results))
 
-    with (
-        patch("app.routes.tags.get_settings", return_value=_settings_with_paperless()),
-        patch("httpx.AsyncClient", return_value=mock_client),
-    ):
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
         resp = client.get("/tags")
 
     assert resp.status_code == 200
@@ -51,7 +37,7 @@ def test_tags_returns_paperless_tags(client):
     ]
 
 
-def test_tags_handles_pagination(client):
+def test_tags_handles_pagination(client, paperless_configured):
     page1 = [{"id": 1, "name": "Invoice", "slug": "invoice", "colour": 1}]
     page2 = [{"id": 2, "name": "Receipt", "slug": "receipt", "colour": 2}]
     mock_client = _mock_async_client(
@@ -59,10 +45,7 @@ def test_tags_handles_pagination(client):
         _mock_paperless_tags_response(page2),
     )
 
-    with (
-        patch("app.routes.tags.get_settings", return_value=_settings_with_paperless()),
-        patch("httpx.AsyncClient", return_value=mock_client),
-    ):
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
         resp = client.get("/tags")
 
     assert resp.status_code == 200
@@ -75,29 +58,23 @@ def test_tags_without_paperless_config_returns_503(client):
     assert resp.status_code == 503
 
 
-def test_tags_paperless_error_returns_502(client):
+def test_tags_paperless_error_returns_502(client, paperless_configured):
     error_resp = httpx.Response(500, request=httpx.Request("GET", "http://paperless:8000/api/tags/"))
     mock_client = _mock_async_client(error_resp)
 
-    with (
-        patch("app.routes.tags.get_settings", return_value=_settings_with_paperless()),
-        patch("httpx.AsyncClient", return_value=mock_client),
-    ):
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
         resp = client.get("/tags")
 
     assert resp.status_code == 502
 
 
-def test_tags_connection_error_returns_502(client):
+def test_tags_connection_error_returns_502(client, paperless_configured):
     mock_client = AsyncMock()
     mock_client.get.side_effect = httpx.ConnectError("nope")
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with (
-        patch("app.routes.tags.get_settings", return_value=_settings_with_paperless()),
-        patch("httpx.AsyncClient", return_value=mock_client),
-    ):
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
         resp = client.get("/tags")
 
     assert resp.status_code == 502
