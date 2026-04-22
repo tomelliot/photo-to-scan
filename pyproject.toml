@@ -21,6 +21,7 @@ dependencies = [
 test = [
     "pytest>=8",
     "pytest-asyncio>=0.25",
+    "pytest-playwright>=0.5",
 ]
 
 [build-system]

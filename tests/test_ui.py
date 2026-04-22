@@ -55,11 +55,10 @@ def test_label_selector_popover_has_search(client):
     assert 'id="label-search"' in resp.text
 
 
-def test_submit_button_includes_selected_tags(client):
-    resp = client.get("/")
-    # The submit button should send selected tag IDs via hx-vals
-    assert "hx-vals" in resp.text
-    assert "selectedTags" in resp.text or "tags" in resp.text
+# The real "does submit include selected tags?" check lives in
+# tests/test_browser.py::test_submit_with_tag_does_not_throw_js_error.
+# A string-match assertion here would pass even if hx-vals evaluated
+# `selectedTags` in global scope and crashed — see commit 74fcbd6.
 
 
 def test_label_selector_to_left_of_submit(client):
