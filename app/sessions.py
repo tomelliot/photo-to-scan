@@ -6,6 +6,7 @@ import shutil
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
+from enum import Enum
 from pathlib import Path
 from time import time
 
@@ -16,6 +17,18 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 SESSION_META_FILE = ".session_meta.json"
+
+
+class SessionStatus(str, Enum):
+    """Terminal state machine for a submit lifecycle.
+
+    DRAFT → SUBMITTING → SUBMITTED is the happy path.
+    A POST failure rolls SUBMITTING back to DRAFT so the user can retry.
+    """
+
+    DRAFT = "draft"
+    SUBMITTING = "submitting"
+    SUBMITTED = "submitted"
 
 
 @dataclass
@@ -34,7 +47,7 @@ class Session:
     pages: list[PageEntry] = field(default_factory=list)
     created_at: float = field(default_factory=time)
     last_active: float = field(default_factory=time)
-    submitted: bool = False
+    status: SessionStatus = SessionStatus.DRAFT
 
     def touch(self):
         self.last_active = time()
@@ -113,11 +126,19 @@ def archive_session(session_id: str, reason: str = "submitted"):
     )
 
 
-def mark_session_submitted(session_id: str):
-    """Mark a session as submitted in memory (for double-submit guard)."""
+def set_session_status(session_id: str, status: SessionStatus) -> None:
+    """Transition a session's submit-lifecycle status.
+
+    See `SessionStatus`. Safe no-op if the session is not in the live store.
+    """
     session = _sessions.get(session_id)
     if session:
-        session.submitted = True
+        session.status = status
+
+
+def mark_session_submitted(session_id: str) -> None:
+    """Convenience: transition a session to SUBMITTED."""
+    set_session_status(session_id, SessionStatus.SUBMITTED)
 
 
 def purge_expired_archives(retention_days: int | None = None):

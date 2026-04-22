@@ -3,7 +3,14 @@ from unittest.mock import patch, AsyncMock
 
 import httpx
 
-from app.sessions import SESSION_COOKIE, get_session, mark_session_submitted, SESSION_META_FILE
+from app.sessions import (
+    SESSION_COOKIE,
+    SESSION_META_FILE,
+    SessionStatus,
+    get_session,
+    mark_session_submitted,
+    set_session_status,
+)
 from tests.conftest import upload_and_process_n
 
 
@@ -122,6 +129,43 @@ def test_submit_without_tags_sends_no_tag_field(client, paperless_configured, sa
         assert not any(k == "tags" for k, _ in sent_data)
     else:
         assert "tags" not in sent_data
+
+
+def test_submit_in_submitting_state_returns_progress_error(client, paperless_configured, sample_jpeg_file):
+    """A session in SUBMITTING state rejects new submits with a distinct message,
+    not the generic 'already submitted' one — helps the user distinguish
+    'it's still sending' from 'this has been sent'."""
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+    set_session_status(sid, SessionStatus.SUBMITTING)
+
+    resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+
+    assert resp.status_code == 200
+    assert "Submission in progress" in resp.text
+    assert "error-modal" in resp.text
+
+
+def test_failed_submit_rolls_back_to_draft_so_retry_works(client, paperless_configured, sample_jpeg_file):
+    """The STM's rollback invariant: a Paperless error must return status to
+    DRAFT, not leave it stuck in SUBMITTING. Otherwise the user can never retry."""
+    sid = upload_and_process_n(client, sample_jpeg_file, 1)
+
+    # First attempt: Paperless returns 500
+    failing_mock = _mock_paperless(status=500)
+    with patch("app.paperless.httpx.AsyncClient", return_value=failing_mock):
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+    assert "Upload failed" in resp.text
+
+    session = get_session(sid)
+    assert session is not None, "session must be retained on failure"
+    assert session.status == SessionStatus.DRAFT, "status must roll back to DRAFT"
+
+    # Second attempt: Paperless accepts the document
+    success_mock = _mock_paperless(status=200)
+    with patch("app.paperless.httpx.AsyncClient", return_value=success_mock):
+        resp = client.post("/submit", cookies={SESSION_COOKIE: sid})
+    assert resp.status_code == 200
+    success_mock.post.assert_called_once()
 
 
 def test_submit_writes_session_meta(client, paperless_configured, sample_jpeg_file):
