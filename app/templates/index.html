@@ -305,7 +305,7 @@
         </div>
 
         <button id="submit-btn" hx-post="/submit" hx-swap="none"
-                hx-vals="js:{tags: selectedTags}"
+                :hx-vals="tagsParam()"
                 class="flex-1 text-white py-3 rounded-lg font-medium" style="background-color: #2A5323;"
                 :class="{ 'opacity-50 pointer-events-none': submitting || uploading || processing > 0 }"
                 :disabled="submitting || uploading || processing > 0"
