@@ -48,16 +48,25 @@ _ROTATE_BTN = (
 _IMG_CLASS = "w-auto rounded-lg cursor-pointer"
 _IMG_STYLE = "max-height: 70vh; max-width: 30vw;"
 
+_FAILED_BADGE = (
+    '<div class="absolute bottom-2 left-2 right-2 bg-red-600/90 text-white '
+    'text-xs font-medium px-2 py-1 rounded text-center pointer-events-none">'
+    'Could not detect document'
+    '</div>'
+)
+
 
 def render_thumbnail(page: PageEntry) -> str:
     img_type = "processed" if page.processed else "original"
     delete_btn = _DELETE_BTN.format(page_id=page.id)
     rotate_btn = _ROTATE_BTN.format(page_id=page.id)
+    failed_badge = _FAILED_BADGE if page.status == "failed" else ""
     return (
         f'<div id="page-{page.id}" class="{_THUMB_CLASS}">'
         f'<img src="/pages/{page.id}/image?type={img_type}&v={int(time())}" '
         f'alt="page" class="{_IMG_CLASS}" style="{_IMG_STYLE}" '
         f'onclick="openLightbox(this.src)">'
+        f'{failed_badge}'
         f'{delete_btn}'
         f'{rotate_btn}'
         f"</div>"

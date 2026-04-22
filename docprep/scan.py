@@ -48,12 +48,13 @@ def scan_document(
     debug_prefix: str = "",
     *,
     enhance: bool = True,
-) -> np.ndarray:
+) -> np.ndarray | None:
     """Detect, crop, deskew, and enhance a document from a photo.
 
-    Returns the cropped, deskewed, and (by default) enhanced document, or the
-    original image if no document is detected. Set ``enhance=False`` to return
-    the geometric-only result without shadow/white-balance/contrast correction.
+    Returns the cropped, deskewed, and (by default) enhanced document, or
+    ``None`` if no document could be detected. Callers must handle ``None``
+    explicitly — returning the original image as a "success" sentinel
+    (the prior behaviour) made detection failures invisible to the UI.
     """
     dbg = DebugWriter(debug_dir, debug_prefix)
     dbg.write("00_input", image)
@@ -62,12 +63,12 @@ def scan_document(
     polygon = model(image)
 
     if polygon is None or len(polygon) == 0:
-        return image
+        return None
 
     corners = polygon.astype(np.float32)
 
     if corners.shape != (4, 2):
-        return image
+        return None
 
     dbg.write_quad("01_quad", image, corners.reshape(4, 1, 2).astype(np.int32))
 

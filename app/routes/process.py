@@ -28,8 +28,11 @@ async def process_page(
     try:
         result = run_scan(image)
     except Exception:
-        log.exception("Scan failed for page %s", page_id)
-        page.status = "done"
+        log.exception("Scan raised for page %s; treating as detection failure", page_id)
+        result = None
+
+    if result is None:
+        page.status = "failed"
         return render_thumbnail(page)
 
     processed_path = page.original.with_name(f"{page.id}_processed.jpg")
