@@ -65,7 +65,14 @@ class PaperlessClient:
             "files": {"document": (filename, pdf_bytes, "application/pdf")},
         }
         if tag_ids:
-            post_kwargs["data"] = [("tags", str(tid)) for tid in tag_ids]
+            # NOTE: the shape `{"tags": [...]}` (dict-with-list) is load-bearing
+            # for httpx 0.28. Passing `[("tags", v), ("tags", v)]` (list of
+            # tuples) — the equivalent shape for repeated form fields — raises
+            # `RuntimeError: Attempted to send an sync request with an
+            # AsyncClient instance.` Both shapes serialise identically on the
+            # wire (tags=1&tags=2), but only the dict form produces an
+            # AsyncByteStream inside AsyncClient's multipart encoder.
+            post_kwargs["data"] = {"tags": [str(tid) for tid in tag_ids]}
         resp = await self._transport.post(
             "/api/documents/post_document/", **post_kwargs
         )
