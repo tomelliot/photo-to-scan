@@ -1,8 +1,10 @@
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.cleanup import cleanup_loop
 from app.config import get_settings
@@ -38,9 +40,13 @@ async def _render_app_error(request: Request, exc: AppError) -> HTMLResponse:
     return HTMLResponse(content=html, status_code=200)
 
 
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Paperless Feeder", lifespan=lifespan)
     app.add_exception_handler(AppError, _render_app_error)
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
     app.get("/health")(health)
     app.include_router(pages_router)
     app.include_router(upload_router)

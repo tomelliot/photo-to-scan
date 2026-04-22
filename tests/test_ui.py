@@ -42,10 +42,18 @@ def test_label_selector_uses_lucide_icon(client):
     assert "lucide" in resp.text.lower()
 
 
-def test_label_selector_loads_tags_in_background(client):
-    """Tags should be fetched on page load via /tags."""
+def test_index_loads_alpine_component_module(client):
+    """The UI's Alpine state lives in /static/app.js (STANDARDS rule 5).
+    Verify the template references it and the file is served."""
     resp = client.get("/")
-    assert "/tags" in resp.text
+    assert 'src="/static/app.js"' in resp.text
+
+    js_resp = client.get("/static/app.js")
+    assert js_resp.status_code == 200
+    # The behaviour under test — loading tags in the background — is
+    # exercised end-to-end by tests/test_browser.py; string-match tests on
+    # the JS body would re-create the false-confidence problem from 74fcbd6.
+    assert "documentUploader" in js_resp.text
 
 
 def test_label_selector_popover_has_search(client):
