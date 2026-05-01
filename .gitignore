@@ -1,6 +1,7 @@
 .env
 test/out/
 test/debug/
+ablation_out/
 docs/journal/
 .venv/
 __pycache__/
