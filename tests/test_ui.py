@@ -6,9 +6,12 @@ from app.sessions import SESSION_COOKIE, get_session
 from tests.conftest import upload_and_process_n
 
 
-def test_index_has_capture_input(client):
+def test_index_has_file_input(client):
     resp = client.get("/")
-    assert 'capture="environment"' in resp.text
+    # The add-page input accepts images...
+    assert 'accept="image/*"' in resp.text
+    # ...but does not force the camera, so the user can pick camera or files.
+    assert 'capture=' not in resp.text
 
 
 def test_index_has_submit_button(client):

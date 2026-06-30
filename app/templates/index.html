@@ -217,7 +217,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <input type="file" accept="image/*" capture="environment" class="hidden"
+                <input type="file" accept="image/*" class="hidden"
                        hx-post="/upload" hx-target="#page-list .add-btn" hx-swap="beforebegin"
                        hx-encoding="multipart/form-data" name="file"
                        @htmx:before-request="uploading = true"
@@ -242,8 +242,8 @@
         <div class="relative" @click.outside="labelOpen = false">
             <button id="label-selector-btn" type="button"
                     class="label-selector-btn h-12 w-12 flex items-center justify-center rounded-lg bg-white border border-gray-300 text-gray-700"
-                    :class="{ 'opacity-50 pointer-events-none': !tagsLoaded || submitting || uploading }"
-                    :disabled="!tagsLoaded || submitting || uploading"
+                    :class="{ 'opacity-50 pointer-events-none': !tagsLoaded || submitting }"
+                    :disabled="!tagsLoaded || submitting"
                     :title="tagsLoaded ? 'Add labels' : (tagsError ? 'Could not load labels' : 'Loading labels…')"
                     @click="labelOpen = !labelOpen; $nextTick(() => { if (labelOpen) document.getElementById('label-search').focus(); })">
                 <i data-lucide="tags" class="w-5 h-5"></i>
