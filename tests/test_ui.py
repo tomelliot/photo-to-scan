@@ -8,10 +8,10 @@ from tests.conftest import upload_and_process_n
 
 def test_index_has_file_input(client):
     resp = client.get("/")
-    # The add-page input accepts images...
-    assert 'accept="image/*"' in resp.text
-    # ...but does not force the camera, so the user can pick camera or files.
-    assert 'capture=' not in resp.text
+    # Two add-page inputs: one forcing the camera, one for picking a file.
+    # (Android's photo picker offers no camera option, so one input can't do both.)
+    assert resp.text.count('accept="image/*"') == 2
+    assert resp.text.count('capture="environment"') == 1
 
 
 def test_index_has_submit_button(client):

@@ -204,24 +204,44 @@
             <div hx-get="/pages" hx-trigger="load" hx-target="#page-list .add-btn"
                  hx-swap="beforebegin" style="display:none"></div>
 
-            <!-- Add page button -->
-            <label class="add-btn flex-shrink-0 w-24 h-24 flex items-center justify-center
-                          bg-white border-2 border-dashed border-gray-300 rounded-lg cursor-pointer
-                          hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                   :class="{ 'opacity-50 pointer-events-none': uploading || submitting }">
-                <svg x-show="!uploading" class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-                <svg x-show="uploading" class="animate-spin w-8 h-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+            <!-- Add page buttons: take a photo, or pick an image from the device -->
+            <div class="add-btn flex-shrink-0 w-24 h-24 flex flex-col
+                        bg-white border-2 border-dashed border-gray-300 rounded-lg overflow-hidden
+                        hover:border-blue-400 transition-colors"
+                 :class="{ 'opacity-50 pointer-events-none': uploading || submitting }">
+                <label x-show="!uploading" class="flex-1 flex items-center justify-center cursor-pointer
+                              text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/>
+                        <circle cx="12" cy="13" r="3"/>
+                    </svg>
+                    <input type="file" accept="image/*" capture="environment" class="hidden"
+                           hx-post="/upload" hx-target="#page-list .add-btn" hx-swap="beforebegin"
+                           hx-encoding="multipart/form-data" name="file"
+                           @htmx:before-request="uploading = true"
+                           @htmx:after-request="uploading = false; $el.value = ''">
+                </label>
+                <label x-show="!uploading" class="flex-1 flex items-center justify-center cursor-pointer
+                              text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2"
+                         stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                        <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+                        <circle cx="10" cy="12" r="2"/>
+                        <path d="m20 17-1.296-1.296a2.41 2.41 0 0 0-3.408 0L9 22"/>
+                    </svg>
+                    <input type="file" accept="image/*" class="hidden"
+                           hx-post="/upload" hx-target="#page-list .add-btn" hx-swap="beforebegin"
+                           hx-encoding="multipart/form-data" name="file"
+                           @htmx:before-request="uploading = true"
+                           @htmx:after-request="uploading = false; $el.value = ''">
+                </label>
+                <svg x-show="uploading" class="animate-spin w-8 h-8 text-blue-500 m-auto" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
-                <input type="file" accept="image/*" class="hidden"
-                       hx-post="/upload" hx-target="#page-list .add-btn" hx-swap="beforebegin"
-                       hx-encoding="multipart/form-data" name="file"
-                       @htmx:before-request="uploading = true"
-                       @htmx:after-request="uploading = false; $el.value = ''">
-            </label>
+            </div>
         </div>
     </div>
 
