@@ -4,6 +4,8 @@ test/debug/
 ablation_out/
 docs/journal/
 .venv/
+.cache/
+app/static/tailwind.css
 __pycache__/
 *.pyc
 *.egg-info/

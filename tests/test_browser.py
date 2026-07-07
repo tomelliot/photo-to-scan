@@ -11,6 +11,7 @@ Run requires Chromium: `uv run playwright install chromium`.
 from __future__ import annotations
 
 import os
+import pathlib
 import socket
 import subprocess
 import sys
@@ -41,6 +42,17 @@ def _wait_for_http(url: str, timeout: float = 15.0) -> None:
     raise RuntimeError(f"timed out waiting for {url}: {last_exc!r}")
 
 
+def _ensure_tailwind_css() -> None:
+    """Build app/static/tailwind.css if missing (gitignored, built artifact).
+
+    Tailwind's `hidden` class drives real behaviour (e.g. the lightbox), so
+    browser tests need the stylesheet present.
+    """
+    root = pathlib.Path(__file__).parent.parent
+    if not (root / "app" / "static" / "tailwind.css").exists():
+        subprocess.run([str(root / "scripts" / "build-css.sh")], check=True)
+
+
 @pytest.fixture(scope="module")
 def live_server(tmp_path_factory) -> str:
     """Spawn the real app on a free port. Yields the base URL.
@@ -49,6 +61,7 @@ def live_server(tmp_path_factory) -> str:
     behaviour (no JS errors, correct request payloads); they do not rely on a
     successful server→Paperless round-trip.
     """
+    _ensure_tailwind_css()
     port = _free_port()
     work_dir = tmp_path_factory.mktemp("sessions")
     env = {

@@ -34,6 +34,10 @@ Take photos of documents with your phone, and Paperless Feeder will automaticall
 
 FastAPI, HTMX, Alpine.js, Tailwind CSS, Pillow (PDF assembly)
 
+Frontend libraries are vendored under `app/static/vendor/` (pinned versions,
+no CDN at runtime). Tailwind is compiled with the [standalone CLI](https://tailwindcss.com/blog/standalone-cli)
+— no Node toolchain anywhere.
+
 ## Setup
 
 Requires Python 3.12+.
@@ -83,8 +87,13 @@ The token only needs upload-capable permissions (`add_document`,
 
 ```bash
 uv sync
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+./scripts/dev.sh
 ```
+
+This runs uvicorn with `--reload` plus Tailwind in watch mode. The Tailwind
+standalone CLI is downloaded to `.cache/` on first run (no Node required);
+the stylesheet is generated at `app/static/tailwind.css` (gitignored — the
+Docker build produces its own copy).
 
 ### Run with Docker
 

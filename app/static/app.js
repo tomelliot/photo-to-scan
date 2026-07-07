@@ -22,7 +22,6 @@ document.addEventListener('alpine:init', () => {
 
         init() {
             this.loadTags();
-            this.$nextTick(() => window.lucide && window.lucide.createIcons());
         },
 
         loadTags() {
@@ -34,7 +33,6 @@ document.addEventListener('alpine:init', () => {
                 .then(data => {
                     this.tags = data;
                     this.tagsLoaded = true;
-                    this.$nextTick(() => window.lucide && window.lucide.createIcons());
                 })
                 .catch(() => { this.tagsError = true; });
         },
