@@ -1,10 +1,15 @@
 """Post-crop enhancement: shadow removal, white balance, contrast.
 
 Fast CPU-only pipeline (OpenCV + NumPy) applied after geometric correction:
-illumination flattening -> paper-anchored white balance -> percentile stretch
-on L -> CLAHE on L -> mild unsharp on L. Order matters: flattening first so
-every downstream statistic operates on an unbiased field; unsharp last so it
-doesn't amplify CLAHE-boosted noise.
+illumination flattening -> paper-anchored white balance -> white-point scale
+on L -> global S-curve on L -> mild unsharp on L. Order matters: flattening
+first so every downstream statistic operates on an unbiased field; unsharp
+last so it doesn't amplify contrast-boosted noise.
+
+The flatten background estimate and the contrast stages are deliberately
+non-spatial or ink-masked: morphological envelopes (close/dilate) and CLAHE
+both darkened the paper immediately around text (ablation suite, 2026-07-07),
+because their estimates are biased exactly where paper meets ink.
 """
 
 import cv2
@@ -13,17 +18,34 @@ import numpy as np
 from docprep.debug import DebugWriter
 
 
-def flatten_illumination(bgr: np.ndarray, se_size: int = 51) -> np.ndarray:
-    """Remove low-frequency shadows via multiplicative correction on LAB's L."""
+def flatten_illumination(bgr: np.ndarray, window: int | None = None) -> np.ndarray:
+    """Remove low-frequency shadows via multiplicative correction on LAB's L.
+
+    The background is estimated as the mean of *paper pixels only* in each
+    neighborhood (normalized convolution over an ink mask). Ink never enters
+    the estimate, so the paper right next to a glyph is corrected exactly like
+    open paper — a morphological close here left a dark ring around text.
+
+    window defaults to ~1/8 of the short image side so behaviour is stable
+    across input resolutions.
+    """
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     L = lab[..., 0]
+    if window is None:
+        window = max(31, (min(L.shape) // 8) | 1)
 
-    se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (se_size, se_size))
-    bg = cv2.morphologyEx(L, cv2.MORPH_CLOSE, se)
-    bg = cv2.GaussianBlur(bg, (0, 0), sigmaX=se_size / 3.0).astype(np.float32)
+    _, ink = cv2.threshold(L, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    paper = (ink == 0).astype(np.float32)
+    Lf = L.astype(np.float32)
 
-    L_flat = np.clip(L.astype(np.float32) / np.maximum(bg, 1.0) * bg.mean(), 0, 255)
-    lab[..., 0] = L_flat.astype(np.uint8)
+    num = cv2.boxFilter(Lf * paper, -1, (window, window), normalize=False)
+    den = cv2.boxFilter(paper, -1, (window, window), normalize=False)
+    bg = num / np.maximum(den, 1.0)
+    fallback = float(np.median(Lf[paper > 0])) if paper.any() else 255.0
+    bg[den < 1.0] = fallback  # windows with no paper at all (e.g. bold headings)
+    bg = np.maximum(cv2.GaussianBlur(bg, (0, 0), sigmaX=window / 6.0), 1.0)
+
+    lab[..., 0] = np.clip(Lf / bg * bg.mean(), 0, 255).astype(np.uint8)
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
@@ -56,30 +78,37 @@ def balance_white(
     return np.clip(bgr.astype(np.float32) * gains, 0, 255).astype(np.uint8)
 
 
-def stretch_contrast_L(
-    bgr: np.ndarray, low_pct: float = 1.0, high_pct: float = 99.0
-) -> np.ndarray:
-    """Linear percentile stretch on LAB's L channel (hue preserved)."""
+def whitepoint_L(bgr: np.ndarray, pct: float = 90.0) -> np.ndarray:
+    """Scale L so the paper level (bright percentile) maps to white.
+
+    Unlike a two-sided percentile stretch there is no black-point anchor, so
+    small local residues from flattening are not amplified into visible rings.
+    """
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    L = lab[..., 0]
-    lo, hi = np.percentile(L, (low_pct, high_pct))
-    scale = 255.0 / max(hi - lo, 1.0)
-    lab[..., 0] = np.clip((L.astype(np.float32) - lo) * scale, 0, 255).astype(np.uint8)
+    L = lab[..., 0].astype(np.float32)
+    p = max(float(np.percentile(L, pct)), 1.0)
+    lab[..., 0] = np.clip(L * (255.0 / p), 0, 255).astype(np.uint8)
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
-def apply_clahe_L(
-    bgr: np.ndarray, clip: float = 2.0, tile: tuple[int, int] = (8, 8)
-) -> np.ndarray:
-    """Local micro-contrast via CLAHE on L. Clip kept low to avoid noise boost."""
+def scurve_L(bgr: np.ndarray, strength: float = 6.0, mid: float = 0.55) -> np.ndarray:
+    """Global sigmoid contrast on L: darkens ink, pushes paper toward white.
+
+    Purely tonal (no spatial component), so unlike CLAHE it cannot darken one
+    neighborhood relative to another.
+    """
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
-    clahe = cv2.createCLAHE(clipLimit=clip, tileGridSize=tile)
-    lab[..., 0] = clahe.apply(lab[..., 0])
+    x = lab[..., 0].astype(np.float32) / 255.0
+    s = 1.0 / (1.0 + np.exp(-strength * (x - mid)))
+    lo = 1.0 / (1.0 + np.exp(strength * mid))
+    hi = 1.0 / (1.0 + np.exp(-strength * (1.0 - mid)))
+    lab[..., 0] = np.clip((s - lo) / (hi - lo) * 255.0, 0, 255).astype(np.uint8)
     return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
 
 
-def unsharp_L(bgr: np.ndarray, sigma: float = 1.2, amount: float = 0.7) -> np.ndarray:
-    """Mild unsharp mask on L. Applied last so CLAHE noise isn't amplified."""
+def unsharp_L(bgr: np.ndarray, sigma: float = 1.0, amount: float = 0.35) -> np.ndarray:
+    """Mild unsharp mask on L. Applied last, and kept gentle: stronger amounts
+    put a visible dark rim around glyph edges."""
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     L = lab[..., 0]
     blur = cv2.GaussianBlur(L, (0, 0), sigmaX=sigma)
@@ -99,15 +128,15 @@ def enhance_document(
     if debug is not None:
         debug.write("04_balanced", balanced)
 
-    stretched = stretch_contrast_L(balanced)
+    white = whitepoint_L(balanced)
     if debug is not None:
-        debug.write("05_stretched", stretched)
+        debug.write("05_whitepoint", white)
 
-    clahe = apply_clahe_L(stretched)
+    curved = scurve_L(white)
     if debug is not None:
-        debug.write("06_clahe", clahe)
+        debug.write("06_scurve", curved)
 
-    sharp = unsharp_L(clahe)
+    sharp = unsharp_L(curved)
     if debug is not None:
         debug.write("07_unsharp", sharp)
 

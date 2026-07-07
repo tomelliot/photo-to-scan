@@ -2,7 +2,7 @@
 
 A mobile-first web app for processing document photos and uploading them to [Paperless-ngx](https://docs.paperless-ngx.com/) as multi-page documents.
 
-Take photos of documents with your phone, and Paperless Feeder will automatically detect, crop, deskew, and straighten them — then upload the assembled PDF to your Paperless-ngx instance.
+Take photos of documents with your phone, and Paperless Feeder will automatically detect, crop, deskew, and clean them up into scan-quality pages — then upload the assembled PDF to your Paperless-ngx instance.
 
 ## Screenshots
 
@@ -25,9 +25,10 @@ Take photos of documents with your phone, and Paperless Feeder will automaticall
 2. **Detection** — [DocAligner](https://github.com/DocsaidLab/DocAligner) heatmap regression model locates the four document corners
 3. **Perspective crop** — Warps the detected quadrilateral into a rectangle
 4. **Deskew** — Hough-based skew correction straightens residual rotation
-5. **Tag** — Optionally attach one or more Paperless-ngx tags from a searchable popover
-6. **Assemble** — Combine multiple pages into a single PDF
-7. **Upload** — Send the PDF to Paperless-ngx via its API
+5. **Enhance** — Shadow removal (illumination flattening over an ink-masked background estimate), paper white balance, white-point scaling, S-curve contrast, and mild sharpening turn the photo into a scan-quality page
+6. **Tag** — Optionally attach one or more Paperless-ngx tags from a searchable popover
+7. **Assemble** — Combine multiple pages into a single PDF
+8. **Upload** — Send the PDF to Paperless-ngx via its API
 
 ## Stack
 
@@ -128,9 +129,10 @@ docprep/                # Document processing library
 ├── cli.py              # Click CLI entry point
 ├── scan.py             # Detection, perspective crop, orchestration
 ├── deskew.py           # Post-crop rotation correction
+├── enhance.py          # Shadow removal, white balance, contrast
 └── debug.py            # Pipeline visualization writer
 
-tests/                  # pytest test suite (35 tests)
+tests/                  # pytest test suite
 ```
 
 ## Tests
