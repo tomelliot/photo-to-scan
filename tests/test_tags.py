@@ -53,6 +53,68 @@ def test_tags_handles_pagination(client, paperless_configured):
     assert [t["name"] for t in data] == ["Invoice", "Receipt"]
 
 
+def test_tags_sorted_by_document_count_descending(client, paperless_configured):
+    results = [
+        {"id": 1, "name": "Invoice", "slug": "invoice", "colour": 1, "document_count": 3},
+        {"id": 2, "name": "Receipt", "slug": "receipt", "colour": 2, "document_count": 41},
+        {"id": 3, "name": "Warranty", "slug": "warranty", "colour": 3, "document_count": 0},
+    ]
+    mock_client = _mock_async_client(_mock_paperless_tags_response(results))
+
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
+        resp = client.get("/tags")
+
+    assert resp.status_code == 200
+    assert [t["name"] for t in resp.json()] == ["Receipt", "Invoice", "Warranty"]
+
+
+def test_tags_sorted_by_name_when_counts_tie(client, paperless_configured):
+    """Ties break on name so the picker order doesn't shuffle between requests."""
+    results = [
+        {"id": 1, "name": "receipt", "slug": "receipt", "colour": 1, "document_count": 5},
+        {"id": 2, "name": "Invoice", "slug": "invoice", "colour": 2, "document_count": 5},
+        {"id": 3, "name": "Bank", "slug": "bank", "colour": 3, "document_count": 5},
+    ]
+    mock_client = _mock_async_client(_mock_paperless_tags_response(results))
+
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
+        resp = client.get("/tags")
+
+    assert resp.status_code == 200
+    assert [t["name"] for t in resp.json()] == ["Bank", "Invoice", "receipt"]
+
+
+def test_tags_sorts_across_pages(client, paperless_configured):
+    """The most-used tag on page 2 must still come first overall."""
+    page1 = [{"id": 1, "name": "Invoice", "slug": "invoice", "colour": 1, "document_count": 2}]
+    page2 = [{"id": 2, "name": "Receipt", "slug": "receipt", "colour": 2, "document_count": 9}]
+    mock_client = _mock_async_client(
+        _mock_paperless_tags_response(page1, next_page="http://paperless:8000/api/tags/?page=2"),
+        _mock_paperless_tags_response(page2),
+    )
+
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
+        resp = client.get("/tags")
+
+    assert resp.status_code == 200
+    assert [t["name"] for t in resp.json()] == ["Receipt", "Invoice"]
+
+
+def test_tags_without_document_count_falls_back_to_name_order(client, paperless_configured):
+    """Older Paperless versions omit `document_count`; don't 500 on them."""
+    results = [
+        {"id": 1, "name": "Receipt", "slug": "receipt", "colour": 1},
+        {"id": 2, "name": "Invoice", "slug": "invoice", "colour": 2},
+    ]
+    mock_client = _mock_async_client(_mock_paperless_tags_response(results))
+
+    with patch("app.paperless.httpx.AsyncClient", return_value=mock_client):
+        resp = client.get("/tags")
+
+    assert resp.status_code == 200
+    assert [t["name"] for t in resp.json()] == ["Invoice", "Receipt"]
+
+
 def test_tags_without_paperless_config_returns_503(client):
     resp = client.get("/tags")
     assert resp.status_code == 503
