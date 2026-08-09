@@ -31,6 +31,7 @@ class PaperlessNotConfigured(Exception):
 class Tag:
     id: int
     name: str
+    document_count: int = 0
 
 
 class PaperlessClient:
@@ -50,7 +51,15 @@ class PaperlessClient:
             resp.raise_for_status()
             payload = resp.json()
             tags.extend(
-                Tag(id=t["id"], name=t["name"]) for t in payload.get("results", [])
+                # `document_count` is only present when Paperless is asked for
+                # it (and is absent on older versions), so default to 0 rather
+                # than KeyError on a tag list we can otherwise use.
+                Tag(
+                    id=t["id"],
+                    name=t["name"],
+                    document_count=t.get("document_count", 0),
+                )
+                for t in payload.get("results", [])
             )
             url = payload.get("next")
         return tags

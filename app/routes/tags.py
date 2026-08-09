@@ -27,4 +27,10 @@ async def list_tags(settings: Settings = Depends(get_settings)):
             detail=f"Could not reach Paperless-ngx: {type(exc).__name__}",
         )
 
+    # Most-used tags first so the labels the user reaches for sit at the top of
+    # the picker; name breaks ties so the order is stable between requests.
+    # Sorted here rather than via a Paperless `ordering=` param so the result
+    # doesn't depend on the remote's sort support, and applies across all pages.
+    tags = sorted(tags, key=lambda t: (-t.document_count, t.name.lower()))
+
     return [{"id": t.id, "name": t.name} for t in tags]

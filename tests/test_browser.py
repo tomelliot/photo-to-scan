@@ -10,6 +10,7 @@ Run requires Chromium: `uv run playwright install chromium`.
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import socket
@@ -138,6 +139,50 @@ def test_submit_with_tag_does_not_throw_js_error(page: Page, live_server: str) -
 
     assert errors == [], f"uncaught JS errors during submit: {errors}"
     assert "tags=42" in body, f"expected tags=42 in POST body, got: {body!r}"
+
+
+def test_label_popover_preserves_server_tag_order(page: Page, live_server: str) -> None:
+    """The picker must render /tags in the order the server sent it.
+
+    The server sorts tags by document count descending. Nothing client-side
+    may re-sort or reverse that — `filteredTags()` passes the array through
+    and Alpine's keyed `x-for` follows source order. `live_server` has no
+    Paperless, so stub /tags with an order that is neither alphabetical nor
+    by id: any accidental client-side sort would produce a different order.
+    """
+    page.route(
+        "**/tags",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps([
+                {"id": 7, "name": "Receipt"},    # most used
+                {"id": 2, "name": "Aardvark"},
+                {"id": 9, "name": "Invoice"},
+                {"id": 4, "name": "Zebra"},      # least used
+            ]),
+        ),
+    )
+
+    page.goto(live_server + "/")
+
+    # The button is disabled until /tags resolves; clicking it proves the fetch
+    # landed as well as opening the popover.
+    button = page.locator("#label-selector-btn")
+    expect(button).to_be_enabled()
+    button.click()
+
+    def rendered_names() -> list[str]:
+        # Each item wraps a checkmark SVG next to the name, so the element's
+        # text carries surrounding whitespace.
+        return [t.strip() for t in page.locator(".label-popover__item").all_text_contents()]
+
+    expect(page.locator(".label-popover__item")).to_have_count(4)
+    assert rendered_names() == ["Receipt", "Aardvark", "Invoice", "Zebra"]
+
+    # Filtering must not reorder the survivors either.
+    page.fill("#label-search", "e")
+    assert rendered_names() == ["Receipt", "Invoice", "Zebra"]
 
 
 def test_page_loads_without_js_errors(page: Page, live_server: str) -> None:
